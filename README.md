@@ -1,4 +1,6 @@
-# Last Done
+# Last Did
+
+Live at **https://lastdid.netlify.app**.
 
 Track when you last did each chore (sweeping, laundry, working out), sorted by what's most overdue. Lists can be shared: everyone in a household sees who did what, and a tap on one phone shows up on the others right away.
 
@@ -28,7 +30,7 @@ Then open http://localhost:8000.
 
 1. Push this folder to a GitHub repo.
 2. On https://app.netlify.com: **Add new site → Import from Git**, then pick the repo. Leave the build command empty; `netlify.toml` already says to publish the root.
-3. Note the site URL, e.g. `https://lastdone-yourname.netlify.app`. You can rename it under **Site configuration → Change site name**.
+3. Note the site URL, e.g. `https://lastdid-yourname.netlify.app`. You can rename it under **Site configuration → Change site name**.
 
 ### 3. Sign-in
 

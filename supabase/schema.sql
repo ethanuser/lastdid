@@ -1,4 +1,4 @@
--- Last Done: database schema and security rules.
+-- Last Did: database schema and security rules.
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
 -- Safe to run once on a fresh project.
 

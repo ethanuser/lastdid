@@ -1,6 +1,6 @@
 {
-  "name": "Last Done",
-  "short_name": "Last Done",
+  "name": "Last Did",
+  "short_name": "Last Did",
   "description": "Track when you last did each chore, shared with your household.",
   "start_url": "./",
   "display": "standalone",
