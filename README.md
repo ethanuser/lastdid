@@ -1,10 +1,10 @@
 # Last Did
 
-Live at **https://lastdid.netlify.app**.
+Live at **https://ethanuser.github.io/lastdid/** (GitHub Pages; every push to `main` updates it).
 
 Track when you last did each chore (sweeping, laundry, working out), sorted by what's most overdue. Lists can be shared: everyone in a household sees who did what, and a tap on one phone shows up on the others right away.
 
-- **Site:** plain HTML/CSS/JS with no build step, hosted on Netlify.
+- **Site:** plain HTML/CSS/JS with no build step, hosted on GitHub Pages.
 - **Data and sign-in:** Supabase (free tier). Sign in with Google or an emailed link.
 - **Privacy:** row-level security rules in `supabase/schema.sql` mean each person only ever gets their own lists' rows from the database.
 
@@ -26,17 +26,19 @@ Then open http://localhost:8000.
 2. **SQL Editor → New query**: paste all of `supabase/schema.sql`, then **Run**.
 3. **Project Settings → API**: copy the **Project URL** and the **anon public** key into `config.js`. Both are safe to commit, because the security rules decide what the key can do.
 
-### 2. Netlify
+### 2. GitHub Pages
 
-1. Push this folder to a GitHub repo.
-2. On https://app.netlify.com: **Add new site → Import from Git**, then pick the repo. Leave the build command empty; `netlify.toml` already says to publish the root.
-3. Note the site URL, e.g. `https://lastdid-yourname.netlify.app`. You can rename it under **Site configuration → Change site name**.
+1. Push this folder to a public GitHub repo.
+2. In the repo: **Settings → Pages → Build and deployment**, choose **Deploy from a branch**, branch `main`, folder `/ (root)`. There's no build step; `.nojekyll` tells GitHub to serve the files as they are.
+3. The site appears at `https://YOUR-NAME.github.io/REPO/` within a minute or two, and every push to `main` updates it.
+
+(Netlify works too, but new free Netlify sites show a "Powered by Netlify" badge that can't be turned off. `netlify.toml` here just forwards the old lastdid.netlify.app address to GitHub Pages.)
 
 ### 3. Sign-in
 
 In Supabase **Authentication → URL Configuration**:
-- **Site URL**: your Netlify URL.
-- **Redirect URLs**: add `https://YOUR-SITE.netlify.app/**` and `http://localhost:8000/**`.
+- **Site URL**: your GitHub Pages URL.
+- **Redirect URLs**: add `https://YOUR-NAME.github.io/REPO/**` and `http://localhost:8000/**`.
 
 Email links work at this point. For **Google**:
 1. In Google Cloud Console, go to **APIs & Services → Credentials → Create credentials → OAuth client ID** and choose **Web application**.
@@ -67,5 +69,6 @@ Open the site and use **Share → Add to Home Screen** (Safari) or **⋮ → Add
 | `theme.js`, `ui.js`, `sound.js` | themes, shared controls and tooltips, UI sounds (same system as VidAnki) |
 | `config.js` | Supabase URL and anon key (empty = demo mode) |
 | `supabase/schema.sql` | tables, security rules, join/create functions |
-| `netlify.toml` | Netlify settings |
+| `netlify.toml` | forwards the old Netlify address to GitHub Pages |
+| `.nojekyll` | tells GitHub Pages to serve the files as they are |
 | `manifest.webmanifest`, `icon*` | home-screen app icon |

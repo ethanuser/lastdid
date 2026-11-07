@@ -1,9 +1,10 @@
-# Plain static site: no build step, publish the repo root.
+# The app now lives on GitHub Pages (https://ethanuser.github.io/lastdid/).
+# The old Netlify address only forwards there, so saved links and home-screen icons keep working.
 [build]
   publish = "."
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+[[redirects]]
+  from = "/*"
+  to = "https://ethanuser.github.io/lastdid/:splat"
+  status = 301
+  force = true
