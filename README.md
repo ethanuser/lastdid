@@ -32,7 +32,7 @@ Then open http://localhost:8000.
 2. In the repo: **Settings → Pages → Build and deployment**, choose **Deploy from a branch**, branch `main`, folder `/ (root)`. There's no build step; `.nojekyll` tells GitHub to serve the files as they are.
 3. The site appears at `https://YOUR-NAME.github.io/REPO/` within a minute or two, and every push to `main` updates it.
 
-(Netlify works too, but new free Netlify sites show a "Powered by Netlify" badge that can't be turned off. `netlify.toml` here just forwards the old lastdid.netlify.app address to GitHub Pages.)
+(Netlify or any other static host works too. New free Netlify sites show a "Powered by Netlify" badge that can't be turned off, which is why this one moved to GitHub Pages.)
 
 ### 3. Sign-in
 
@@ -69,6 +69,5 @@ Open the site and use **Share → Add to Home Screen** (Safari) or **⋮ → Add
 | `theme.js`, `ui.js`, `sound.js` | themes, shared controls and tooltips, UI sounds (same system as VidAnki) |
 | `config.js` | Supabase URL and anon key (empty = demo mode) |
 | `supabase/schema.sql` | tables, security rules, join/create functions |
-| `netlify.toml` | forwards the old Netlify address to GitHub Pages |
 | `.nojekyll` | tells GitHub Pages to serve the files as they are |
 | `manifest.webmanifest`, `icon*` | home-screen app icon |
