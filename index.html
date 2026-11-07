@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Last Done</title>
+  <meta name="description" content="Track when you last did each chore, shared with your household.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Last Done">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <span class="brand"><span class="logo" aria-hidden="true"><i data-icon="check"></i></span><span class="brand-name">Last Done</span></span>
+    <div id="house-picker" hidden></div>
+    <span class="spacer"></span>
+    <div class="head-tools">
+      <button id="signin-btn" class="btn small quiet" hidden>Sign in</button>
+      <button id="list-btn" class="icon-btn" aria-label="List: invite and members" data-tip="List: invite and members" hidden><i data-icon="users"></i></button>
+      <button id="settings-btn" class="icon-btn" aria-label="Settings" data-tip="Settings (,)"><i data-icon="settings"></i></button>
+    </div>
+  </header>
+  <main id="app"></main>
+
+  <!-- app settings: per device, like VidAnki's -->
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-box settings-box" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head"><span id="settings-title">Settings</span><button class="icon-btn" data-close aria-label="Close" data-tip="Close (Esc)"><i data-icon="x"></i></button></div>
+      <div class="set-body">
+        <div class="set-section">Chores</div>
+        <div class="set-row"><span class="set-label"><i data-icon="sort"></i>Sort by</span><div id="sort-pick" aria-label="Sort by"></div></div>
+        <div class="set-row"><span class="set-label" data-tip="A chore turns amber once this much of its interval has passed"><i data-icon="gauge"></i>Amber from</span><div id="warn-pick" aria-label="Amber from"></div></div>
+        <div class="set-row"><span class="set-label"><i data-icon="rows"></i>Density</span><div id="density-pick" aria-label="Density"></div></div>
+        <div class="set-row"><label class="set-label" for="meters-on"><i data-icon="bar"></i>Progress bars</label><label class="check"><input type="checkbox" id="meters-on"><span></span></label></div>
+        <div class="set-row"><label class="set-label" for="who-on"><i data-icon="user"></i>Show who did it last</label><label class="check"><input type="checkbox" id="who-on"><span></span></label></div>
+        <div class="set-row"><label class="set-label" for="chips-on"><i data-icon="bulb"></i>Quick-add suggestions</label><label class="check"><input type="checkbox" id="chips-on"><span></span></label></div>
+
+        <div class="set-section">Look</div>
+        <div class="swatches" id="theme-pick" role="radiogroup" aria-label="Theme"></div>
+        <div class="set-row"><label class="set-label" for="hue-slider"><i data-icon="hue"></i>Your own color</label><input type="range" id="hue-slider" min="0" max="359" step="1"></div>
+        <div class="set-row"><span class="set-label"><i data-icon="sun"></i>Mode</span><div id="mode-pick" aria-label="Mode"></div></div>
+        <div class="set-row"><span class="set-label"><i data-icon="type"></i>Font</span><div id="font-pick" aria-label="Font"></div></div>
+
+        <div class="set-section">Sound</div>
+        <div class="set-row">
+          <label class="set-label" for="sound-on"><i data-icon="volume"></i>Sound effects</label>
+          <span class="row"><input type="range" id="sound-vol" min="0" max="1" step="0.05" aria-label="Sound volume" data-tip="Volume"><label class="check"><input type="checkbox" id="sound-on"><span></span></label></span>
+        </div>
+
+        <div class="set-section">About</div>
+        <p class="about-text">Last Done keeps track of when you last did each chore and what's due next. Made by Ethan Nguyen. Settings here are saved on this device only.</p>
+        <div class="about-links">
+          <a class="icon-btn" href="https://github.com/ethanuser" target="_blank" rel="noopener" aria-label="Made by Ethan Nguyen" data-tip="Made by Ethan Nguyen"><i data-icon="user"></i></a>
+          <a class="icon-btn" href="https://github.com/ethanuser/lastdone" target="_blank" rel="noopener" aria-label="Source code on GitHub" data-tip="Source code on GitHub"><i data-icon="code"></i></a>
+          <a class="icon-btn" id="feedback-link" href="#" target="_blank" rel="noopener" aria-label="Suggest improvements" data-tip="Suggest improvements" hidden><i data-icon="message"></i></a>
+          <a class="icon-btn" href="https://buymeacoffee.com/ethannguyen" target="_blank" rel="noopener" aria-label="Buy me a coffee" data-tip="Buy me a coffee"><i data-icon="coffee"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <div id="modal" class="modal" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="sound.js"></script>
+  <script src="chores.js"></script>
+  <script src="ui.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
