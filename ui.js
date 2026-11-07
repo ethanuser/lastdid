@@ -218,3 +218,41 @@ hydrateIcons();
   ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, hide, true));
   document.addEventListener('scroll', hide, true);
 })();
+
+// Popups: lock the page behind while one is open, and on phones let the header be dragged
+// down to close it. A short drag springs back; a long or fast one closes, through the same
+// Escape path each popup already handles (so unsaved-import warnings still apply).
+(function () {
+  const modals = () => [...document.querySelectorAll('.modal')];
+  const sync = () => document.documentElement.classList.toggle('modal-open', modals().some((m) => !m.hidden));
+  const watch = new MutationObserver(sync);
+  modals().forEach((m) => watch.observe(m, { attributes: true, attributeFilter: ['hidden'] }));
+
+  const phone = window.matchMedia('(max-width: 520px)');
+  let drag = null;
+  document.addEventListener('pointerdown', (e) => {
+    const head = e.target.closest('.modal .modal-head');
+    if (!head || !phone.matches || e.target.closest('button, a, input')) return;
+    const sheet = head.closest('.modal-box, .card');
+    if (!sheet || sheet.scrollTop > 0) return;  // only from the top, so it never fights scrolling
+    drag = { sheet, y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId };
+    head.setPointerCapture(e.pointerId);
+    sheet.classList.add('sheet-drag');
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.dy = Math.max(0, e.clientY - drag.y);
+    drag.sheet.style.transform = drag.dy ? `translateY(${drag.dy}px)` : '';
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const { sheet, dy, t } = drag;
+    drag = null;
+    sheet.classList.remove('sheet-drag');
+    const fast = dy > 30 && dy / (performance.now() - t) > 0.6;
+    sheet.style.transform = '';  // springs back (and stays put if closing is refused)
+    if (dy > 110 || fast) sheet.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
