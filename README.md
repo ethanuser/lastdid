@@ -55,6 +55,7 @@ Open the site and use **Share → Add to Home Screen** (Safari) or **⋮ → Add
 - **Order:** chores are sorted by *time since last done ÷ target interval*, so "laundry, 9 days, every 7" ranks above "vacuum, 10 days, every 14". Chores never done come first.
 - **Colors:** green means under 75% of the interval (you can change the threshold), amber means close, red means overdue.
 - **Settings** (sliders button, or press `,`): sort order, amber threshold, density, progress bars, who did it, suggestions, 7 color themes plus a custom hue, light/dark/auto, 3 fonts, and sound effects. Saved per device.
+- **Import & export** (the ⇅ button above the list, or the list's people view): export a file with every chore's full history, or copy a plain-text list. Import takes that file, any JSON list of chores, or plain text with one chore per line (`Water plants, every 4 days`, `Laundry (weekly), last 2026-11-05`, `Change sheets | 2w`). It previews every change before saving, and it only ever adds: no deletes or renames, your intervals win unless you tick the imported one, and history you already have is skipped, so importing the same thing twice changes nothing. One Undo reverses a whole import, and a failed import rolls itself back. Handy for asking an AI to write a list for you.
 - **Fixing mistakes:** **Undo** in the toast, or open a chore and remove an entry from its history. You can only remove your own entries. **Did it earlier?** logs a past time.
 
 ## Files
@@ -62,6 +63,7 @@ Open the site and use **Share → Add to Home Screen** (Safari) or **⋮ → Add
 | File | What |
 |---|---|
 | `index.html`, `style.css`, `app.js` | the app |
+| `transfer.js`, `transfer.test.js` | import/export parsing and merge rules, and their tests (`node transfer.test.js`) |
 | `theme.js`, `ui.js`, `sound.js` | themes, shared controls and tooltips, UI sounds (same system as VidAnki) |
 | `config.js` | Supabase URL and anon key (empty = demo mode) |
 | `supabase/schema.sql` | tables, security rules, join/create functions |

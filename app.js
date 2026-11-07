@@ -62,6 +62,17 @@ function makeDemoStore() {
       db.completions.push(c); save(); return c;
     },
     async undo(id) { db.completions = db.completions.filter(c => c.id !== id); save(); },
+    // bulk versions, for import and its undo
+    async addChores(hid, rows) {
+      const made = rows.map((r) => ({ id: uid(), household_id: hid, name: r.name, interval_days: r.interval_days, created_at: new Date().toISOString() }));
+      db.chores.push(...made); save(); return structuredClone(made);
+    },
+    async completeMany(hid, rows) {
+      const made = rows.map((r) => ({ id: uid(), household_id: hid, chore_id: r.chore_id, user_id: ME.id, done_at: r.done_at }));
+      db.completions.push(...made); save(); return structuredClone(made);
+    },
+    async undoMany(ids) { const gone = new Set(ids); db.completions = db.completions.filter(c => !gone.has(c.id)); save(); },
+    async deleteChores(ids) { const gone = new Set(ids); db.chores = db.chores.filter(c => !gone.has(c.id)); db.completions = db.completions.filter(c => !gone.has(c.chore_id)); save(); },
     subscribe() { return () => {}; },
   };
 }
@@ -95,6 +106,11 @@ function makeSupabaseStore() {
     complete: (hid, chore_id, done_at) => q(sb.from('completions')
       .insert({ household_id: hid, chore_id, ...(done_at ? { done_at } : {}) }).select().single()),
     undo: (id) => q(sb.from('completions').delete().eq('id', id)),
+    // bulk versions, for import and its undo; each is one request, so it all lands or none of it does
+    addChores: (hid, rows) => q(sb.from('chores').insert(rows.map((r) => ({ household_id: hid, name: r.name, interval_days: r.interval_days }))).select()),
+    completeMany: (hid, rows) => q(sb.from('completions').insert(rows.map((r) => ({ household_id: hid, chore_id: r.chore_id, done_at: r.done_at }))).select()),
+    undoMany: (ids) => q(sb.from('completions').delete().in('id', ids)),
+    deleteChores: (ids) => q(sb.from('chores').delete().in('id', ids)),
     subscribe(hid, onChange) {
       const ch = sb.channel('h-' + hid)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'completions', filter: 'household_id=eq.' + hid }, onChange)
@@ -554,7 +570,8 @@ function renderList(app) {
   app.innerHTML = `
     <div class="toolbar">
       <span class="summary">${summary}</span>
-      ${S.chores.length ? `<button class="btn small" id="add-toggle" aria-expanded="${S.adding}" data-tip="${S.adding ? 'Close' : 'Add a chore'} (N)">${icon('plus')}${S.adding ? 'Close' : 'Add chore'}</button>` : ''}
+      <span class="row" style="gap:var(--s1)"><button class="icon-btn" id="transfer-btn" aria-label="Import or export chores" data-tip="Import or export chores">${icon('transfer')}</button>
+      ${S.chores.length ? `<button class="btn small" id="add-toggle" aria-expanded="${S.adding}" data-tip="${S.adding ? 'Close' : 'Add a chore'} (N)">${icon('plus')}${S.adding ? 'Close' : 'Add chore'}</button>` : ''}</span>
     </div>
     ${showForm ? `<form class="add-form${enter('add')}" id="add-form" novalidate>
       <div class="row">
@@ -575,6 +592,7 @@ function renderList(app) {
 
   const toggle = app.querySelector('#add-toggle');
   if (toggle) toggle.onclick = () => toggleAdd();
+  app.querySelector('#transfer-btn').onclick = () => openTransfer();
   const form = app.querySelector('#add-form');
   if (form) {
     const unit = new Segmented(form.querySelector('#unit'), { options: UNITS, value: S.addUnit, onChange: (v) => { S.addUnit = v; } });
@@ -827,6 +845,204 @@ async function joinHousehold() {
   try { const h = await store.joinHousehold(code); await loadHouseholds(); S.hid = h.id; S.view = 'list'; await loadHousehold(); render(); toast(`Joined ${h.name}`); play('confirm'); } catch (e) { fail(e); }
 }
 
+// ═══ Import & export ════════════════════════════════════════════════════
+// Parsing and the merge plan live in transfer.js (and its tests). This is the window around them.
+// Import only adds: new chores, missing history, and (if you tick it) a different interval.
+// It's checked against a fresh copy of the list right before saving, and one Undo takes it all back.
+
+const MAX_IMPORT_HISTORY = 5000;
+
+function download(filename, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'list';
+const chunks = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+
+function openTransfer() {
+  const h = S.households.find((x) => x.id === S.hid);
+  if (!h) return;
+  const m = $('#modal');
+  m.innerHTML = `<div class="card stack transfer" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
+    <div class="modal-head flat"><span id="transfer-title">Import &amp; export</span><button class="icon-btn" data-close aria-label="Close" data-tip="Close (Esc)">${icon('x')}</button></div>
+
+    <section>
+      <div class="sec-label">${icon('download')}Export “${esc(h.name)}”</div>
+      <div class="row">
+        <button class="btn" id="exp-file" ${S.chores.length ? '' : 'disabled'}>${icon('download')}Download file</button>
+        <button class="btn" id="exp-text" ${S.chores.length ? '' : 'disabled'}>${icon('copy')}Copy as text</button>
+      </div>
+      <div class="note">The file keeps every chore's full history. Text keeps one line per chore with when it was last done.</div>
+    </section>
+
+    <section>
+      <div class="sec-label">${icon('upload')}Import into “${esc(h.name)}”</div>
+      <textarea id="imp-text" rows="6" spellcheck="false" placeholder="Paste chores, one per line:&#10;Water plants, every 4 days&#10;Change sheets, every 2 weeks, last 2026-11-01&#10;Laundry (weekly)&#10;&#10;…or paste a Last Did export file."></textarea>
+      <div class="row">
+        <label class="btn small" id="imp-file-label">${icon('upload')}Open a file<input type="file" id="imp-file" accept=".json,.txt,.csv,.tsv,.md,text/plain,application/json" hidden></label>
+        <span class="note">Lines like “every 3 days”, “weekly”, “2w” or “twice a week” all work.</span>
+      </div>
+      <div id="imp-preview" class="imp-preview" aria-live="polite"></div>
+    </section>
+
+    <div class="imp-foot">
+      <span class="note">${icon('shield')}Never deletes or renames anything. Importing the same thing twice adds nothing.</span>
+      <button class="btn primary" id="imp-go" disabled>Import</button>
+    </div>
+  </div>`;
+  m.hidden = false;
+  play('open');
+  const box = m.querySelector('.transfer');
+  const ta = box.querySelector('#imp-text');
+  const preview = box.querySelector('#imp-preview');
+  const go = box.querySelector('#imp-go');
+  let parsed = { items: [] }, plan = null;
+  const choices = new Map();  // chore key -> use the imported interval?
+
+  // an unsent import is work: the first close only warns, a second one (within 4s) discards it
+  let armedUntil = 0;
+  const close = () => {
+    if (!go.disabled && performance.now() > armedUntil) {
+      armedUntil = performance.now() + 4000;
+      const note = box.querySelector('.imp-foot .note');
+      note.classList.add('warn'); note.innerHTML = `${icon('alert')}Close again to discard what you pasted.`;
+      box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge');
+      play('limit');
+      return;
+    }
+    m.hidden = true; m.innerHTML = ''; m.onkeydown = null; play('close');
+  };
+  box.querySelector('[data-close]').onclick = close;
+  m.onclick = (e) => { if (e.target === m) close(); };
+  m.onkeydown = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+
+  // export
+  box.querySelector('#exp-file').onclick = (e) => {
+    download(`last-did-${slug(h.name)}-${new Date().toISOString().slice(0, 10)}.json`, Transfer.exportJSON(h.name, S.chores, S.comps), 'application/json');
+    confirmOn(e.currentTarget, 'Downloaded');
+  };
+  box.querySelector('#exp-text').onclick = async (e) => {
+    const text = Transfer.exportText(S.chores, S.comps);
+    try { await navigator.clipboard.writeText(text); confirmOn(e.currentTarget, 'Copied'); }
+    catch { ta.value = text; ta.focus(); ta.select(); toast('Copy blocked by the browser; the text is in the box below'); }
+  };
+
+  // import: preview on every change, nothing saved until the button
+  function refreshPlan() {
+    parsed = Transfer.parse(ta.value);
+    plan = parsed.items.length ? Transfer.plan(parsed.items, S.chores, S.comps) : null;
+    plan?.rows.forEach((r) => { if (r.status === 'differs') r.useImported = !!choices.get(Transfer.key(r.name)); });
+    drawPreview();
+  }
+  function drawPreview() {
+    if (parsed.error) { preview.innerHTML = `<div class="imp-msg bad">${icon('alert')}${esc(parsed.error)}</div>`; return setGo(); }
+    if (!plan) { preview.innerHTML = ''; return setGo(); }
+    const p = plan;
+    const changed = p.rows.filter((r) => r.status === 'differs' && r.useImported).length;
+    const chip = (n, cls, label) => (n ? `<span class="pill ${cls}">${n} ${label}</span>` : '');
+    const histTotal = p.newHistory;
+    const rowHtml = (r) => {
+      if (r.status === 'error') return `<li class="imp-row err">${icon('alert')}<span class="ir-name">Line ${r.line}: ${esc(r.raw)}</span><span class="ir-meta">${esc(r.error)}</span></li>`;
+      const every = everyText(r.status === 'differs' && !r.useImported ? r.current.interval_days : r.every);
+      const hist = r.addHistory.length ? ` <span class="ir-hist" data-tip="Past dates this chore was done, added to its history">+${r.addHistory.length} dated</span>` : '';
+      const note = r.guessed ? ' <span class="ir-warn" data-tip="No interval given, so it starts at weekly. Change it after importing.">guessed</span>' : '';
+      const dup = r.dupes ? ` <span class="ir-dup" data-tip="This chore is in the import ${r.dupes + 1} times. The first one's interval is used; dates from all of them are kept.">listed ${r.dupes + 1}×</span>` : '';
+      if (r.status === 'differs') {
+        const k = Transfer.key(r.name);
+        return `<li class="imp-row differs">${icon('alert')}<span class="ir-name">${esc(r.name)}${hist}${dup}</span>
+          <label class="check ir-choice" data-tip="Yours is ${everyText(r.current.interval_days)}; the import says ${everyText(r.every)}"><input type="checkbox" data-key="${esc(k)}"${r.useImported ? ' checked' : ''}><span></span>use ${everyText(r.every)}</label></li>`;
+      }
+      const ic = r.status === 'new' ? 'plus' : 'check';
+      return `<li class="imp-row ${r.status}">${icon(ic)}<span class="ir-name">${esc(r.name)}${hist}${note}${dup}</span><span class="ir-meta">${r.status === 'same' ? 'already here' : every}</span></li>`;
+    };
+    preview.innerHTML = `<div class="imp-sum">${chip(p.newChores, 'new', 'new')}${chip(histTotal, 'hist', histTotal === 1 ? 'past date' : 'past dates')}${chip(p.unchanged, 'same', 'already here')}${chip(p.differs, 'differs', 'different interval')}${chip(p.errors, 'err', "couldn't read")}${parsed.truncated ? '<span class="pill err">only the first 500 read</span>' : ''}</div>
+      <ul class="imp-list">${p.rows.map(rowHtml).join('')}</ul>
+      ${histTotal > MAX_IMPORT_HISTORY ? `<div class="imp-msg bad">${icon('alert')}That's ${histTotal} history entries; the most one import takes is ${MAX_IMPORT_HISTORY}.</div>` : ''}`;
+    preview.querySelectorAll('input[data-key]').forEach((cb) => {
+      cb.onchange = () => { choices.set(cb.dataset.key, cb.checked); play('toggle'); refreshPlan(); };
+    });
+    setGo(changed);
+  }
+  function setGo(changed = 0) {
+    const p = plan;
+    const n = p ? p.newChores : 0, hn = p ? p.newHistory : 0;
+    const parts = [n && `${n} chore${n === 1 ? '' : 's'}`, hn && `${hn} past date${hn === 1 ? '' : 's'}`, changed && `${changed} interval${changed === 1 ? '' : 's'}`].filter(Boolean);
+    go.disabled = !parts.length || hn > MAX_IMPORT_HISTORY;
+    go.textContent = parts.length ? `Import ${parts.join(', ')}` : (p && !p.errors ? 'Nothing new to import' : 'Import');
+  }
+  let t;
+  ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(refreshPlan, 150); });
+  box.querySelector('#imp-file').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 2_000_000) return fail(new Error('That file is over 2 MB, which is more than a chore list should be.'));
+    ta.value = await f.text(); refreshPlan(); play('select');
+  };
+  go.onclick = async () => {
+    go.classList.add('loading'); go.disabled = true;
+    try {
+      const result = await applyImport(parsed.items, choices);
+      m.hidden = true; m.innerHTML = ''; m.onkeydown = null;
+      const bits = [result.chores && `${result.chores} chore${result.chores === 1 ? '' : 's'}`, result.history && `${result.history} past date${result.history === 1 ? '' : 's'}`, result.intervals && `${result.intervals} interval${result.intervals === 1 ? '' : 's'}`].filter(Boolean);
+      play('milestone');
+      toast(bits.length ? `Imported ${bits.join(', ')}` : 'Nothing new to import; someone may have just added the same', bits.length ? { action: { label: 'Undo', run: result.undo } } : {});
+    } catch (e) {
+      go.classList.remove('loading'); refreshPlan(); fail(e);
+    }
+  };
+  ta.focus();
+}
+
+// Saves an import. Plans again against a fresh copy of the list first, so a chore someone else
+// just added isn't duplicated and their newer history isn't repeated. If any step fails, the
+// steps before it are undone, so a failed import leaves the list as it was.
+async function applyImport(items, choices) {
+  const hid = S.hid;
+  const [chores, comps] = await Promise.all([store.chores(hid), store.completions(hid)]);
+  const p = Transfer.plan(items, chores, comps);
+  const made = { chores: [], comps: [], intervals: [] };
+  const undo = async () => {
+    if (made.comps.length) for (const ids of chunks(made.comps, 100)) await store.undoMany(ids);
+    if (made.chores.length) for (const ids of chunks(made.chores, 100)) await store.deleteChores(ids);
+    for (const [id, days] of made.intervals) await store.updateChore(id, { interval_days: days });
+  };
+  try {
+    const fresh = p.rows.filter((r) => r.status === 'new');
+    const ids = new Map();  // chore key -> id, for history rows
+    for (const part of chunks(fresh, 200)) {
+      const rows = await store.addChores(hid, part.map((r) => ({ name: r.name, interval_days: r.every })));
+      rows.forEach((c) => { made.chores.push(c.id); ids.set(Transfer.key(c.name), c.id); });
+    }
+    const history = [];
+    for (const r of p.rows) {
+      if (!r.addHistory?.length) continue;
+      const id = r.current ? r.current.id : ids.get(Transfer.key(r.name));
+      if (id) r.addHistory.forEach((done_at) => history.push({ chore_id: id, done_at }));
+    }
+    if (history.length > MAX_IMPORT_HISTORY) throw new Error(`Too many history entries (${history.length}); the most one import takes is ${MAX_IMPORT_HISTORY}.`);
+    for (const part of chunks(history, 500)) {
+      const rows = await store.completeMany(hid, part);
+      made.comps.push(...rows.map((x) => x.id));
+    }
+    for (const r of p.rows) {
+      if (r.status !== 'differs' || !choices.get(Transfer.key(r.name))) continue;
+      await store.updateChore(r.current.id, { interval_days: r.every });
+      made.intervals.push([r.current.id, Number(r.current.interval_days)]);
+    }
+  } catch (e) {
+    await undo().catch(() => {});
+    throw new Error('Import failed and was rolled back: ' + (e?.message || e));
+  }
+  await loadHousehold(); render();
+  return {
+    chores: made.chores.length, history: made.comps.length, intervals: made.intervals.length,
+    undo: async () => {
+      try { await undo(); await loadHousehold(); render(); play('close'); toast('Import undone'); } catch (e) { fail(e); }
+    },
+  };
+}
+
 // ═══ List settings view (invite, members, this list, account) ═══════════
 
 function renderListSettings(app) {
@@ -851,6 +1067,7 @@ function renderListSettings(app) {
 
     <section><div class="sec-label">This list</div>
       <div class="row">
+        <button class="btn" id="transfer2">${icon('transfer')}Import or export</button>
         <button class="btn" id="rename">${icon('pencil')}Rename list</button>
         <button class="btn danger" id="leave">${store.guest ? `${icon('trash')}Delete list` : `${icon('logout')}Leave list`}</button>
       </div></section>
@@ -874,6 +1091,7 @@ function renderListSettings(app) {
     const n = await ask('Your name in this list', { value: mine?.display_name }); if (!n) return;
     try { await store.renameMe(S.hid, n); mine.display_name = n; render(); play('confirm'); } catch (e) { fail(e); }
   });
+  app.querySelector('#transfer2').onclick = () => openTransfer();
   app.querySelector('#rename').onclick = async () => {
     const n = await ask('Rename list', { value: h.name }); if (!n) return;
     try { await store.renameHousehold(h.id, n); h.name = n; render(); play('confirm'); } catch (e) { fail(e); }

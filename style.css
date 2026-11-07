@@ -420,3 +420,45 @@ label.set-label { cursor: pointer; }
   .combo { flex-basis: 100%; }
   .combo-list { max-height: 50vh; }
 }
+
+/* ---------- import & export ---------- */
+.modal .card.transfer { max-width: 560px; max-height: calc(100vh - 32px); overflow: auto; padding: 0 var(--s4) var(--s4); gap: var(--s4); }
+.modal-head.flat { margin: 0 calc(-1 * var(--s4)); }
+.transfer .sec-label .icon { width: 14px; height: 14px; }
+.transfer .note .icon { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+.transfer .note.warn { color: var(--warn); }
+.transfer textarea { width: 100%; min-height: 120px; padding: var(--s2) var(--s3); resize: vertical; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--panel2); color: var(--text); font: var(--t-md)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; outline: none;
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease); }
+.transfer textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.transfer textarea::placeholder { color: var(--muted); }
+.transfer section { display: flex; flex-direction: column; gap: var(--s2); }
+.transfer section .row .note { flex: 1; min-width: 160px; }
+#imp-file-label { cursor: pointer; }
+.imp-preview:empty { display: none; }
+.imp-sum { display: flex; flex-wrap: wrap; gap: var(--s1); margin-bottom: var(--s2); }
+.imp-sum .pill { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--s2); border-radius: var(--r-pill); font-size: var(--t-sm); font-weight: 600;
+  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.pill.new { --c: var(--accent); } .pill.hist { --c: var(--good); } .pill.same { --c: var(--muted); } .pill.differs { --c: var(--warn); } .pill.err { --c: var(--bad); }
+.imp-list { list-style: none; margin: 0; padding: var(--s1); max-height: 240px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); }
+.imp-row { display: flex; align-items: center; gap: var(--s2); min-height: 32px; padding: 2px var(--s2); border-radius: 6px; font-size: var(--t-md); }
+.imp-row > .icon { width: 14px; height: 14px; color: var(--c, var(--muted)); }
+.imp-row.new { --c: var(--accent); } .imp-row.same { --c: var(--muted); color: var(--muted); } .imp-row.differs { --c: var(--warn); } .imp-row.err { --c: var(--bad); color: var(--bad); }
+.ir-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ir-meta { flex: none; color: var(--muted); font-size: var(--t-sm); }
+.imp-row.err .ir-meta { color: var(--bad); white-space: normal; text-align: right; }
+.ir-hist { color: var(--good); font-size: var(--t-sm); font-weight: 600; margin-left: var(--s1); }
+.ir-warn { color: var(--warn); font-size: var(--t-xs); font-weight: 600; margin-left: var(--s1); padding: 0 6px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.ir-choice { flex: none; font-size: var(--t-sm); }
+.ir-choice > span { width: 16px; height: 16px; }
+.imp-msg { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3); border-radius: var(--r-sm); font-size: var(--t-sm); }
+.imp-msg.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.imp-foot { position: sticky; bottom: calc(-1 * var(--s4)); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin: 0 calc(-1 * var(--s4)) calc(-1 * var(--s4));
+  padding: var(--s3) var(--s4); border-top: 1px solid var(--line); background: var(--panel); }
+.imp-foot .note { flex: 1; min-width: 200px; }
+.ir-dup { color: var(--muted); font-size: var(--t-xs); margin-left: var(--s1); }
+/* an unreadable line shows in full: which line, then why */
+.imp-row.err { flex-wrap: wrap; align-items: flex-start; padding-block: 6px; }
+.imp-row.err > .icon { margin-top: 3px; }
+.imp-row.err .ir-name { flex: 1 1 0; white-space: normal; overflow-wrap: anywhere; }
+.imp-row.err .ir-meta { flex-basis: 100%; padding-left: 22px; text-align: left; font-size: var(--t-xs); }
